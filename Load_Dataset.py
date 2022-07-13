@@ -11,6 +11,7 @@ import os
 import cv2
 from scipy import ndimage
 from bert_embedding import BertEmbedding
+import h5py
 
 
 def random_rot_flip(image, label):
@@ -198,3 +199,64 @@ class ImageToImage2D(Dataset):
             sample = self.joint_transform(sample)
 
         return sample, image_filename
+
+
+class BaseDataSets(Dataset):
+    def __init__(
+        self,
+        base_dir=None,
+        split="train",
+        num=None,
+        transform=None,
+        ops_weak=None,
+        ops_strong=None,
+    ):
+        self._base_dir = base_dir
+        self.sample_list = []
+        self.split = split
+        self.transform = transform
+        self.ops_weak = ops_weak
+        self.ops_strong = ops_strong
+
+        assert bool(ops_weak) == bool(
+            ops_strong
+        ), "For using CTAugment learned policies, provide both weak and strong batch augmentation policy"
+
+        if self.split == "train":
+            with open(self._base_dir + "/train_slices.list", "r") as f1:
+                self.sample_list = f1.readlines()
+            self.sample_list = [item.replace("\n", "") for item in self.sample_list]
+
+        elif self.split == "val":
+            with open(self._base_dir + "/val.list", "r") as f:
+                self.sample_list = f.readlines()
+            self.sample_list = [item.replace("\n", "") for item in self.sample_list]
+        if num is not None and self.split == "train":
+            self.sample_list = self.sample_list[:num]
+        print("total {} samples".format(len(self.sample_list)))
+
+    def __len__(self):
+        return len(self.sample_list)
+
+    def __getitem__(self, idx):
+        image_filename = self.images_list[idx]
+        case = self.sample_list[idx]
+        if self.split == "train":
+            h5f = h5py.File(self._base_dir + "/data/slices/{}.h5".format(case), "r")
+        else:
+            h5f = h5py.File(self._base_dir + "/data/{}.h5".format(case), "r")
+        image = h5f["image"][:]
+        label = h5f["label"][:]
+        sample = {"image": image, "label": label}
+        # if self.split == "train":
+        #     if None not in (self.ops_weak, self.ops_strong):
+        #         sample = self.transform(sample, self.ops_weak, self.ops_strong)
+        #     else:
+        #         sample = self.transform(sample)
+        # sample["idx"] = idx
+
+        if self.joint_transform:
+            sample = self.joint_transform(sample)
+
+        return sample, image_filename
+        # return sample

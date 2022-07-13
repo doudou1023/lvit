@@ -128,7 +128,7 @@ def main_loop(batch_size=config.batch_size, model_type='', tensorboard=True):
     flops, params = profile(model, inputs=(input, text, ))
     print('flops:{}'.format(flops))
     print('params:{}'.format(params))
-    # model = model.cuda()
+    model = model.cuda()
     if torch.cuda.device_count() > 1:
         print("Let's use {0} GPUs!".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
